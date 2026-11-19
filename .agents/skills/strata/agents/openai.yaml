@@ -1,0 +1,5 @@
+interface:
+  display_name: "Strata"
+  short_description: "Map a large effort as a ticket tree, one stratum at a time"
+policy:
+  allow_implicit_invocation: false
