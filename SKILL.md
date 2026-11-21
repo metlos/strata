@@ -40,21 +40,22 @@ additional information about the issue. The canonical `spec.md` file describes t
 The map is an **index**, not a store. It lists the decisions made and points at the tickets that hold their detail; a
 decision lives in exactly one place, its ticket, so the map never restates it, only gists it and links.
 
-The status and relationships (parent, blocking) are represented as properties in the front-matter of the issues'
-`spec.md` files. E.g. the front-matter:
+Put ticket metadata in flat `key: value` front matter in each `spec.md`. Use one plain value per line (no YAML
+lists or nested values). `title` and `status` (`open` or `closed`) are required. `blocks` names sibling ticket
+directories, comma-separated if there is more than one. For example:
 
 ```
 ---
+title: Check the source format
 status: open
 parent: decomposed-issue
 blocks: dependent-issue
 labels: strata:research
+assignee: null
 ---
 ```
 
-specifies that the issue is still open, is a child of the issue stored in the adjacent `decomposed-issue` directory, and
-is blocking another issue that is stored in the adjacent `dependent-issue` directory. The issue is labeled with the
-`strata:research` label.
+This unclaimed research ticket is a child of `decomposed-issue` and blocks `dependent-issue`.
 
 The tickets form a **tree**: decomposition edges (`parent`) give the tree its shape; blocking edges (`blocks`) record
 that one ticket's resolution hangs on another's, within or across strata. Strata themselves are never recorded — the
@@ -107,13 +108,24 @@ Each ticket carries a `strata:<type>` label, one of `research`, `prototype`, `gr
 A session **claims** a ticket by assigning it to the dev driving the map, **first**, before any work, so concurrent
 sessions skip it. That assignee _is_ the claim: an open, unassigned ticket is unclaimed.
 
-Blocking uses the tracker's **native** dependency relationship: essential because it renders the frontier _visually_ in
-the tracker's own UI, so the human sees what's takeable without opening the map. Only a tracker that lacks native
-blocking falls back to a body convention. A ticket is **unblocked** when every ticket blocking it is closed; the
-**frontier** is the open, unblocked, unclaimed children, the edge of the known.
+A ticket is **unblocked** when every ticket blocking it is closed. The **frontier** is the open, unblocked,
+unclaimed tickets that are not marked `handover: ready`. A `parent` edge does not block by itself.
 
 The answer isn't part of the body; it's recorded on resolution (see [Work through the map](#work-through-the-map)).
 Assets created while resolving a ticket are linked from the issue, not pasted in.
+
+### Find and report next tickets
+
+Run `python3 <skill-dir>/scripts/frontier.py .pi/strata/<map>` from the checkout. Replace `<skill-dir>` with the
+absolute path to the directory containing this skill. The script reads only ticket front matter and reports titles
+and paths under **Actionable**, **Blocked** (with blocker titles), **Claimed**, and **Handoff ready**. Use its
+output instead of opening ticket bodies to compute the frontier. If it errors, report the problem instead of
+guessing what is actionable.
+
+Run it when opening a map and again after persisting charting or resolution changes. Use the latest output to tell
+the user what can be looked at next: name and link the actionable tickets first. Recommend one when there is a clear
+reason, such as unlocking a blocked ticket. Then name blockers and distinguish claimed work from execution handoffs.
+If no ticket is actionable, say why. Report the next options without opening a deeper layer automatically.
 
 ### Fully defined
 
@@ -210,17 +222,19 @@ User invokes with a loose idea.
 5. **Fire the research subagents.** For each `research` ticket you just created, spin up a subagent that calls the Skill
    tool with "research" to resolve it in parallel, capturing its findings on a throwaway `research/<name>` branch with a
    context pointer from the ticket.
-6. Stop: charting is one session's work; it hand-resolves nothing, and it charts **one stratum only** — deeper layers
-   open when the user decomposes a ticket, never before.
+6. Use the [frontier script](#find-and-report-next-tickets) to report next tickets, then stop. Charting is one
+   session's work: it hand-resolves nothing and charts **one stratum only**.
 
 ### Work through the map
 
 User invokes with a map (URL or number). A ticket is **optional**: without one, you pick the next decision, not the
 user.
 
-1. Load the **map**: the low-res view, not every ticket body.
-2. Choose the ticket. If the user named one, use it. Otherwise take the first frontier ticket in order. **Claim it**:
-   assign it to yourself before any work.
+1. Load the **map** and run the [frontier script](#find-and-report-next-tickets), not every ticket body.
+2. Choose the ticket. If no ticket was named, take the first under **Actionable**. If there is none, report the
+   state and stop. For a named ticket, check its state before proceeding: don't bypass blockers or another session's
+   claim, and only take an explicit handoff into execution if the map's Notes allow execution. **Claim** the ticket
+   by assigning it to yourself before working its body.
 3. **Size it before resolving.** If the ticket is fully defined (sharp, ~one focused execution session, see
    [Fully defined](#fully-defined)), resolve it: the question is answered, or — when the map's Notes carry execution —
    executed as one unit of handoff. Otherwise the resolution **is the decomposition**: split it into about four sharper
